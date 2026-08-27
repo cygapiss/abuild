@@ -1598,15 +1598,20 @@ scan_shared_objects() {
 	fi
 
 	# now find the so dependencies
-	scanelf --nobanner --recursive --needed  --etype ET_DYN,ET_EXEC "$datadir"  | tr ' ' ':' \
-		| awk -F ":" '$2 != "" {print $2}'  \
-		| sed 's:,:\n:g' | sort -u \
-	| while read soname; do
-		# only add files that are not self provided
-		grep -q -w "^so:$sonameprefix$soname" "$controldir"/.provides-so \
-			|| list_has "$soname" $somask \
-			|| echo $soname
-	done > "$controldir"/.needs-so
+	scanelf --nobanner --recursive --needed --etype ET_DYN,ET_EXEC "$datadir" |
+	awk -F '[ ]' -v somask="$somask" -v sonameprefix="$sonameprefix" -v provides="$controldir"/.provides-so 'BEGIN {
+		split(somask, skip_, /[ \t\n]/);
+		for (i in skip_)
+			skip[skip_[i]] = "";
+		l = length("so:" sonameprefix) + 1
+		while (getline < provides)
+			skip[substr($0, l, index($0, "=")-l)] = "";
+	} {
+		split($2, need, ",");
+		for (i in need)
+			if (!(need[i] in skip))
+				print(need[i]);
+	}' | sort -u > "$controldir"/.needs-so
 }
 
 # normalize a symlink target path (1st arg)
