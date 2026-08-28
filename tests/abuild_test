@@ -2119,7 +2119,8 @@ abuild_so_providers_body() {
 	ABUILD_FILENAME='libfoo.so.1.0.8.git' ABUILD_SONAME='libfoo.so.1' \
 	atf_check -s exit:1 -e match:"libfoo.so.1.0.8.git: library version 1.0.8.git is invalid" \
 		abuild -dKf
-	ABUILD_FILENAME='libfoo.so.1.0.8.git' ABUILD_SONAME='libfoo.so.1' somask=libfoo.so.1 abuild -dKf || atf_fail "abuild failed"
+	ABUILD_FILENAME='libfoo.so.1.0.8.git' ABUILD_SONAME='libfoo.so.1' somask="libbar.so.2 	libfoo.so.1
+libbaz.so" abuild -dKf || atf_fail "abuild failed"
 	atf_check -s exit:1 \
 		grep '^provides = ' pkg/.control.pkg/.PKGINFO
 }
