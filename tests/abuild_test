@@ -2121,6 +2121,9 @@ abuild_so_providers_body() {
 		abuild -dKf
 	ABUILD_FILENAME='libfoo.so.1.0.8.git' ABUILD_SONAME='libfoo.so.1' somask="libbar.so.2 	libfoo.so.1
 libbaz.so" abuild -dKf || atf_fail "abuild failed"
-	atf_check -s exit:1 \
+
+	ABUILD_FILENAME='libfoo.so.1.0.8' ABUILD_SONAME='libfoo.so.1' sonameprefix='bar:' abuild -dKf || atf_fail "abuild failed"
+	atf_check \
+		-o match:"provides = so:bar:libfoo.so.1=1.0.8" \
 		grep '^provides = ' pkg/.control.pkg/.PKGINFO
 }
