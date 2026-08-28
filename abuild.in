@@ -1680,7 +1680,6 @@ scan_python3_dependency() {
 # find pkg-config dependencies
 scan_pkgconfig_depends() {
 	local controldir="$2" datadir="$3" i
-	local provides_pc="$controldir"/.provides-pc
 	set --
 	for i in "$datadir"/usr/lib/pkgconfig/*.pc "$datadir"/usr/share/pkgconfig/*.pc; do
 		[ -f "$i" ] && set -- "$@" "$i"
@@ -1690,16 +1689,22 @@ scan_pkgconfig_depends() {
 	(
 		set -o pipefail
 		pkg-config --print-requires --print-requires-private "$@" |
-		sed -E 's/\s*([<>=]+)\s*/\1/' |
+		awk -v provides="$controldir"/.provides-pc 'BEGIN {
+			while (getline < provides)
+				skip[substr($0, 4, index($0, "=")-4)] = "";
+		} {
+			gsub(/\s/, "");
+			if (match($0, /[<>=]/) == 0)
+				RSTART = length()+1;
+			if (!(substr($0, 0, RSTART-1) in skip))
+				print($0);
+		}' |
 		while IFS= read -r pc; do
 			local v="${pc##*[<>=]}"
 			if [ "$v" != "$pc" ]; then
 				pc=${pc%%"$v"}$(pc_to_apk_ver "$v")
 			fi
-			# only add files that are not self provided
-			if ! grep -q -w "^pc:${pc%%[<>=]*}" "$provides_pc"; then
-				echo "$pc"
-			fi
+			printf '%s\n' "$pc"
 		done > "$controldir"/.needs-pc
 	)
 }
