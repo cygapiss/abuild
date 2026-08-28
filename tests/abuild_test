@@ -1855,7 +1855,7 @@ abuild_pc_depends_body() {
 		url="https://gitlab.alpinelinux.org/alpine/aports"
 		arch="noarch"
 		license="MIT"
-		subpackages="noreq self dummy"
+		subpackages="noreq self noself dummy"
 		builddir="$srcdir"
 		options="!check"
 
@@ -1896,13 +1896,28 @@ Version: 1.0
 EOF
 		}
 
+		noself() {
+			mkdir -p "$subpkgdir"/usr/lib/pkgconfig
+			cat > "$subpkgdir"/usr/lib/pkgconfig/pkg.pc <<EOF
+Name: pkg
+Description:
+Version: 1.0
+Requires: s.lf, self.bar
+EOF
+			cat > "$subpkgdir"/usr/lib/pkgconfig/self.pc <<EOF
+Name: pkg
+Description:
+Version: 1.0
+EOF
+		}
+
 		dummy() {
 			mkdir -p "$subpkgdir"/usr/lib/pkgconfig
 			cat > "$subpkgdir"/usr/lib/pkgconfig/pkg.pc <<EOF
 Name: pkg
 Description:
 Version: 1.0
-Provides: unver, fixed = 0.1, bound = 1.2.3.rc5, conflict, private
+Provides: unver, fixed = 0.1, bound = 1.2.3.rc5, conflict, private, s.lf, self.bar
 EOF
 		}
 	__EOF__
@@ -1922,11 +1937,16 @@ EOF
 		-o not-match:"pc:" \
 		grep '^depend = ' pkg/.control.noreq/.PKGINFO
 
-
 	atf_check \
 		-o match:"depend = pkgconf" \
 		-o not-match:"pc:" \
 		grep '^depend = ' pkg/.control.self/.PKGINFO
+
+	atf_check \
+		-o match:"depend = pkgconf" \
+		-o match:"depend = pc:s.lf" \
+		-o match:"depend = pc:self.bar" \
+		grep '^depend = ' pkg/.control.noself/.PKGINFO
 }
 
 abuild_split_vars_reset_body() {
