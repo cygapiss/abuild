@@ -1419,7 +1419,7 @@ find_so_files() {
 }
 
 subpkg_provides() {
-	grep -q -w "^$1" "$pkgbasedir"/.control.*/.provides-* 2>/dev/null
+	awk -v v="$1" -v r=1 -F '[<>=]' 'v == $1 {r=0;exit} END {exit(r)}' "$pkgbasedir"/.control.*/.provides-* 2>/dev/null
 }
 
 trace_apk_deps() {
