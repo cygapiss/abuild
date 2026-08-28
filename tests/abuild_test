@@ -62,7 +62,8 @@ init_tests \
 	abuild_pc_depends \
 	abuild_split_vars_reset \
 	abuild_update_config_sub \
-	abuild_so_providers
+	abuild_so_providers \
+	abuild_so_depends
 
 export ABUILD_SHAREDIR=$(atf_get_srcdir)/..
 export ABUILD_CONF=/dev/null
@@ -2126,4 +2127,82 @@ libbaz.so" abuild -dKf || atf_fail "abuild failed"
 	atf_check \
 		-o match:"provides = so:bar:libfoo.so.1=1.0.8" \
 		grep '^provides = ' pkg/.control.pkg/.PKGINFO
+}
+
+abuild_so_depends_body() {
+	mkdir -p bin
+	cat > bin/scanelf <<-EOF
+		#!/bin/sh
+		for i; do
+			if [ "\$i" = "--soname" ]; then
+				for i; do
+					[ -d "\$i" ] || continue
+					for i in "\$i"/*; do
+						[ -f "\$i" ] || continue
+						echo ET_DYN "\${i##/*}" "\$i"
+					done
+				done
+				break
+			elif [ "\$i" = "--needed" ]; then
+				for i; do
+					[ -d "\$i" ] || continue
+					for i in "\$i"/usr/lib/*.so.*; do
+						[ -f "\$i" ] || continue
+						echo ET_DYN "\$(cat "\$i")" "\$i"
+					done
+				done
+				break
+			fi
+		done
+	EOF
+	chmod +x bin/scanelf
+	PATH="$PWD/bin:$PATH"
+
+	mkdir -p testrepo/pkg
+	cd testrepo/pkg
+	cat > APKBUILD <<-EOF
+		maintainer="Natanael Copa <ncopa@alpinelinux.org>"
+		pkgname=pkg
+		pkgver=1.0
+		pkgrel=0
+		pkgdesc="Dummy test package"
+		url="https://gitlab.alpinelinux.org/alpine/aports"
+		arch="all"
+		license="MIT"
+		options="!check !strip !textrels !archcheck"
+		subpackages="dummy"
+		somask="libmasked1.so.1 	libdummy3.so.1
+		libmasked3.so.1"
+		# sonameprefix
+
+		package() {
+			mkdir -p "\$pkgdir"/usr/lib
+			echo libdummy1.so.1,libdummy2.so.1,libdummy3.so.1 > "\$pkgdir"/usr/lib/libbar.so.1
+			echo libdummy4.so.1 > "\$pkgdir"/usr/lib/libmasked1.so.1
+			touch "\$pkgdir"/usr/lib/libdummy2.so.1
+		}
+
+		dummy() {
+			mkdir -p "\$subpkgdir"/usr/lib
+			touch "\$subpkgdir"/usr/lib/libdummy1.so.1
+			touch "\$subpkgdir"/usr/lib/libdummy3.so.1
+			touch "\$subpkgdir"/usr/lib/libdummy4.so.1
+		}
+	EOF
+
+	abuild -dKf || atf_fail "abuild failed"
+	atf_check \
+		-o match:"depend = so:libdummy1.so.1" \
+		-o not-match:"depend = so:libdummy2.so.1" \
+		-o not-match:"depend = so:libdummy3.so.1" \
+		-o match:"depend = so:libdummy4.so.1" \
+		grep '^depend = ' pkg/.control.pkg/.PKGINFO
+
+	sonameprefix=bar: abuild -dKf || atf_fail "abuild failed"
+	atf_check \
+		-o match:"depend = so:bar:libdummy1.so.1" \
+		-o not-match:"depend = so:bar:libdummy2.so.1" \
+		-o not-match:"depend = so:bar:libdummy3.so.1" \
+		-o match:"depend = so:bar:libdummy4.so.1" \
+		grep '^depend = ' pkg/.control.pkg/.PKGINFO
 }
